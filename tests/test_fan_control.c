@@ -71,17 +71,59 @@ static void Test_InputsAndPause(void)
     assert(control.target_rpm == 1500U); /* 上限固定1500。 */
     Fan_Control_Input(&control, -32768, 0U, 1U, 50U); /* 极大负向步进应限幅且不整数溢出。 */
     assert(control.target_rpm == 0U && control.enabled == 1U); /* 到0档不锁住旋钮。 */
-    Fan_Control_Update(&control, &feedback, 50U); /* 转到0档时直接下发0%请求。 */
-    assert(control.duty_permille == 0U && control.state == FAN_STATE_STOPPED); /* 不进入按键停止的逐步减速。 */
-    assert(control.enabled == 1U && control.faults == 0U); /* 0档保持旋钮使能，也不是故障。 */
+    Fan_Control_Update(&control, &feedback, 50U); /* 转到0档后先降一步。 */
+    assert(control.duty_permille == 560U && control.state == FAN_STATE_SWITCHING); /* 渐减期间仍处于切换状态。 */
+    assert(control.control_target_rpm == 100U && Fan_Control_LedCount(&control) == 0U); /* 追踪低速区，灯立即全灭。 */
     Fan_Control_Input(&control, 1, 0U, 1U, 60U); /* 从运行中选到的0档再向上转一格。 */
-    assert(control.target_rpm == 100U && control.state == FAN_STATE_STARTING); /* 可以立即重新调速。 */
+    assert(control.target_rpm == 100U && control.state == FAN_STATE_SWITCHING); /* 从当前输出恢复调速。 */
+    assert(control.duty_permille == 560U && control.control_target_rpm == 0U); /* 取消减速并等待重新规划。 */
     Fan_Control_Init(&control, 0U, 100U); /* 独立检查上电0档。 */
     feedback.valid = 0U;
     Fan_Control_Update(&control, &feedback, 100U); /* 应用0档输出。 */
     Fan_Control_Input(&control, 1, 0U, 1U, 110U); /* 从0向上旋转一格。 */
     assert(control.target_rpm == 100U && control.enabled == 1U); /* 正常进入100档。 */
     assert(control.state == FAN_STATE_STARTING); /* 从0输出重新软启动。 */
+}
+
+/** 手动0档须经过分步减速，低速反馈确认或每步超时才输出0%。 */
+static void Test_RotaryZero(void)
+{
+    Fan_Control_t control; /* 当前0档切换状态。 */
+    Fan_Feedback_t feedback = {300U, 100U, 1U}; /* 减速前的测速。 */
+    uint32_t attempted = 0U; /* 保存任务已尝试的旋转版本。 */
+
+    Test_Running(&control, 300U, 300U, 0U, 100U); /* 建立稳定运行。 */
+    Fan_Control_Input(&control, -3, 0U, 1U, 10U); /* 人工设到0档。 */
+    Fan_Control_Update(&control, &feedback, 10U); /* 先从30%降到28%。 */
+    feedback.rpm = 151U;
+    feedback.sequence = 102U;
+    Fan_Control_Update(&control, &feedback, 210U); /* 下降已确认，但尚未进入低速区。 */
+    assert(control.duty_permille == 260U && control.state == FAN_STATE_SWITCHING); /* 继续减小一步。 */
+    feedback.rpm = 150U;
+    Fan_Control_Update(&control, &feedback, 220U); /* 相同捕获序号不能确认低速。 */
+    ++feedback.sequence;
+    Fan_Control_Update(&control, &feedback, 230U); /* 单个新边沿仍不足以确认。 */
+    assert(control.duty_permille == 260U && control.state == FAN_STATE_SWITCHING); /* 继续等待完整新周期。 */
+    ++feedback.sequence;
+    Fan_Control_Update(&control, &feedback, 410U); /* 完整周期确认进入低速区上边界。 */
+    assert(control.duty_permille == 0U && control.state == FAN_STATE_STOPPED && control.faults == 0U); /* 正常完成0档切换。 */
+    assert(control.save_target_rpm == 0U && Fan_Control_SaveDue(&control, 300U, 1U, &attempted, 3010U) == 1U); /* 人工0档可以保存。 */
+    Fan_Control_Input(&control, 1, 0U, 1U, 3020U); /* 顺时针一格即可重启。 */
+    assert(control.target_rpm == 100U && control.state == FAN_STATE_STARTING); /* 从0%输出软启动。 */
+
+    Test_Running(&control, 300U, 20U, 0U, 100U); /* 检查占空比降到最小非零值的情况。 */
+    feedback.rpm = 300U;
+    feedback.sequence = 100U;
+    Fan_Control_Input(&control, -3, 0U, 1U, 10U); /* 再次转到0档。 */
+    Fan_Control_Update(&control, &feedback, 10U); /* 最后一步保留非零占空比。 */
+    feedback.rpm = 250U;
+    feedback.sequence = 102U;
+    Fan_Control_Update(&control, &feedback, 510U); /* 转速虽下降，但已无可继续的非零减速步。 */
+    Fan_Control_Update(&control, &feedback, 1009U); /* 尚差1ms才到超时边界。 */
+    assert(control.duty_permille == 1U && control.state == FAN_STATE_SWITCHING); /* 未提前归零。 */
+    Fan_Control_Update(&control, &feedback, 1010U); /* 低速未确认且到期，直接0%。 */
+    assert(control.duty_permille == 0U && control.state == FAN_STATE_STOPPED); /* 超时结束切换。 */
+    assert(control.enabled == 1U && (control.faults & FAN_FAULT_STOP_TIMEOUT) != 0U); /* 保留异常，仍可旋转重启。 */
 }
 
 /** 保存只在旋转结束满3秒后尝试一次，写失败也不会变成周期重试。 */
@@ -369,14 +411,14 @@ static void Test_SwitchingStages(void)
     assert(control.state == FAN_STATE_STABLE); /* 上侧边界也算稳定。 */
 }
 
-/** 允许新样本跨多档推进，中间档满5秒优先追踪最终档。 */
+/** 允许新样本跨多档推进，中间档满5秒仍未过半程就保护归零。 */
 static void Test_SwitchingCatchupAndTimeout(void)
 {
     Fan_Control_t control; /* 当前切换状态。 */
     Fan_Control_t late_sample_control; /* 复用到期前状态，独立检查半程反馈恰好在到期时到达。 */
     Fan_Feedback_t feedback = {400U, 101U, 1U}; /* 初次重新规划所用的新反馈。 */
     uint32_t now; /* 连续有效测速的模拟时刻。 */
-    uint16_t duty_before_timeout; /* 到期前的PWM，用于确认旧样本不触发调节。 */
+    uint32_t attempted = 0U; /* 保存任务已尝试的旋转版本。 */
     Test_Running(&control, 400U, 500U, 0U, 100U); /* 建立原400目标。 */
     Fan_Control_Input(&control, 6, 0U, 1U, 10U); /* 一次旋转切换到1000目标。 */
     Fan_Control_Update(&control, &feedback, 10U); /* 先以400反馈进入500中间档。 */
@@ -400,31 +442,25 @@ static void Test_SwitchingCatchupAndTimeout(void)
     Fan_Control_Update(&control, &feedback, 5009U); /* 距进入中间档4999ms。 */
     assert(control.control_target_rpm == 500U); /* 上限前仍保持当前档。 */
     late_sample_control = control;
-    duty_before_timeout = control.duty_permille;
     Fan_Control_Update(&control, &feedback, 5010U); /* 满5秒时仍只有旧样本。 */
-    assert(control.control_target_rpm == 1000U && control.state == FAN_STATE_SWITCHING); /* 到期先追最终档，仍等待稳定。 */
-    assert(control.duty_permille == duty_before_timeout); /* 旧样本不能更新PWM。 */
-    ++feedback.sequence;
-    Fan_Control_Update(&control, &feedback, 5011U); /* 5秒后收到新有效反馈。 */
-    assert(control.control_target_rpm == 1000U && control.state == FAN_STATE_SWITCHING); /* 反馈400仍未进入最终档稳定带。 */
-    assert(control.speed_error_active == 0U && control.faults == 0U); /* 切换超时仅推进档位，不触发转速偏差保护。 */
-
+    assert(control.target_rpm == 0U && control.duty_permille == 0U && control.state == FAN_STATE_STOPPED); /* 到期直接归零。 */
+    assert(control.enabled == 1U && control.faults == FAN_FAULT_STAGE_TIMEOUT); /* 记录中间档超时，保持旋钮可用。 */
+    assert(control.save_target_rpm == 1000U && Fan_Control_LedCount(&control) == 0U); /* 保留人工设置，运行灯全灭。 */
+    assert(Fan_Control_SaveDue(&control, 400U, 1U, &attempted, 5010U) == 1U); /* 尚未保存时仍可提交人工选择的1000档。 */
     feedback.rpm = 450U;
-    Fan_Control_Update(&late_sample_control, &feedback, 5010U); /* 新半程样本恰好在5秒边界到达。 */
-    assert(late_sample_control.control_target_rpm == 1000U); /* 到期优先，跳过原本的下一个600档。 */
-    assert(late_sample_control.state == FAN_STATE_SWITCHING); /* 450尚不能确认最终档稳定。 */
     ++feedback.sequence;
-    feedback.rpm = 950U;
-    Fan_Control_Update(&late_sample_control, &feedback, 5011U); /* 到期后的新反馈进入最终档±50。 */
-    assert(late_sample_control.state == FAN_STATE_STABLE); /* 用最终档的新有效样本确认稳定。 */
+    Fan_Control_Update(&late_sample_control, &feedback, 5010U); /* 新半程样本恰好在5秒边界到达。 */
+    assert(late_sample_control.state == FAN_STATE_STOPPED && late_sample_control.faults == FAN_FAULT_STAGE_TIMEOUT); /* 满5秒时优先保护。 */
+    Fan_Control_Input(&control, 1, 0U, 1U, 5020U); /* 保护后顺时针一格。 */
+    assert(control.target_rpm == 100U && control.state == FAN_STATE_STARTING && control.faults == 0U); /* 从100档重新软启动。 */
 }
 
-/** 保护允许带包含上下边界，超出后仅由持续2秒的新有效反馈触发。 */
+/** 保护允许带包含上下边界，持续超差满1秒并有新有效反馈时直接归零。 */
 static void Test_StableSpeedDeviation(void)
 {
     Fan_Control_t control; /* 稳定保护及停止状态。 */
     Fan_Feedback_t feedback = {500U, 101U, 1U}; /* 600档允许带下边界。 */
-    uint16_t duty_before_fault; /* 故障前PWM，用于确认复用2%减速首步。 */
+    uint32_t attempted = 0U; /* 保存任务已尝试的旋转版本。 */
     Test_Running(&control, 600U, 600U, 0U, 100U); /* 600档按最小100 RPM保护带。 */
     Fan_Control_Update(&control, &feedback, 10U); /* 精确在下边界500。 */
     assert(control.speed_error_active == 0U); /* 边界在允许范围内。 */
@@ -437,21 +473,19 @@ static void Test_StableSpeedDeviation(void)
     Fan_Control_Update(&control, &feedback, 30U); /* 超过上边界1 RPM才开始计时。 */
     assert(control.speed_error_active != 0U && control.enabled == 1U); /* 还未到保护延时。 */
     ++feedback.sequence;
-    Fan_Control_Update(&control, &feedback, 2030U - 1U); /* 偏差连续1999ms。 */
-    assert(control.enabled == 1U); /* 不能提前停机。 */
-    duty_before_fault = control.duty_permille;
-    Fan_Control_Update(&control, &feedback, 2030U); /* 计时满2秒，但没有新反馈。 */
-    assert(control.enabled == 1U); /* 旧样本不能单独触发保护。 */
+    Fan_Control_Update(&control, &feedback, 1029U); /* 偏差连续999ms。 */
+    assert(control.state == FAN_STATE_STABLE); /* 不能提前停机。 */
+    Fan_Control_Update(&control, &feedback, 1030U); /* 计时满1秒，但没有新反馈。 */
+    assert(control.state == FAN_STATE_STABLE); /* 旧样本不能单独触发保护。 */
     ++feedback.sequence;
-    Fan_Control_Update(&control, &feedback, 2030U); /* 新反馈确认偏差持续满2秒。 */
+    Fan_Control_Update(&control, &feedback, 1030U); /* 新反馈确认偏差持续满1秒。 */
     assert((control.faults & FAN_FAULT_SPEED_DEVIATION) != 0U); /* 保留稳定转速偏差故障。 */
-    assert(control.enabled == 0U && control.target_rpm == 600U); /* 保护锁旋钮并保留设定。 */
+    assert(control.enabled == 1U && control.target_rpm == 0U); /* 运行目标归零并保持旋钮可用。 */
     assert(Fan_Control_LedCount(&control) == 0U); /* 故障触发时立即灭灯。 */
-    assert(control.state == FAN_STATE_STOPPING && control.duty_permille == duty_before_fault - 20U); /* 走与按键停止相同的首步。 */
-    Fan_Control_Update(&control, &feedback, 3030U); /* 停止一步后1秒没有有效下降。 */
-    assert(control.duty_permille == 0U && control.state == FAN_STATE_STOPPED); /* 保护减速仍有0%兜底。 */
-    Fan_Control_Input(&control, 0, 1U, 0U, 3040U); /* 再次按键从保存目标恢复。 */
-    assert(control.enabled == 1U && control.target_rpm == 600U && control.faults == 0U); /* 故障恢复保留目标并清本次故障。 */
+    assert(control.state == FAN_STATE_STOPPED && control.duty_permille == 0U); /* 故障当次就请求0%。 */
+    assert(Fan_Control_SaveDue(&control, 600U, 1U, &attempted, 4000U) == 0U); /* 故障本身不触发保存。 */
+    Fan_Control_Input(&control, 1, 0U, 1U, 4010U); /* 顺时针旋转一格重启。 */
+    assert(control.target_rpm == 100U && control.state == FAN_STATE_STARTING && control.faults == 0U); /* 从100档启动并清除故障。 */
 
     Test_Running(&control, 1500U, 700U, 0U, 200U); /* 1500档采用10%即150 RPM。 */
     feedback.sequence = 201U;
@@ -467,8 +501,8 @@ static void Test_StableSpeedDeviation(void)
     Fan_Control_Update(&control, &feedback, 30U); /* 低于下边界1 RPM。 */
     assert(control.speed_error_active != 0U); /* 欠速与超速都受保护。 */
     feedback.sequence = 204U;
-    Fan_Control_Update(&control, &feedback, 2030U); /* 新反馈确认连续欠速2秒。 */
-    assert(control.state == FAN_STATE_STOPPING && control.enabled == 0U); /* 欠速同样走停止状态机。 */
+    Fan_Control_Update(&control, &feedback, 1030U); /* 新反馈确认连续欠速1秒。 */
+    assert(control.state == FAN_STATE_STOPPED && control.duty_permille == 0U); /* 欠速同样直接停止。 */
 }
 
 /** 重新进允许带、无效反馈、新目标都会清除稳定偏差累计。 */
@@ -487,8 +521,8 @@ static void Test_DeviationResets(void)
     feedback.rpm = 701U;
     Fan_Control_Update(&control, &feedback, 1010U); /* 再次超出带宽，从零重新累计。 */
     ++feedback.sequence;
-    Fan_Control_Update(&control, &feedback, 2010U); /* 距第一次已2秒，但距本次只有1秒。 */
-    assert(control.enabled == 1U); /* 两段超差时长不能累计到一起。 */
+    Fan_Control_Update(&control, &feedback, 2009U); /* 距第一次已超过1秒，本次尚差1ms。 */
+    assert(control.state == FAN_STATE_STABLE); /* 两段超差时长不能累计到一起。 */
     feedback.valid = 0U;
     Fan_Control_Update(&control, &feedback, 2050U); /* 无效反馈打断超差的连续性。 */
     assert(control.speed_error_active == 0U); /* 无效样本清计时。 */
@@ -505,6 +539,7 @@ int main(void)
 {
     Test_InitAndLeds(); /* 默认和LED全部阈值。 */
     Test_InputsAndPause(); /* 启停、锁旋钮和0档语义。 */
+    Test_RotaryZero(); /* 手动0档的低速确认、超时归零和旋转重启。 */
     Test_SaveScheduling(); /* 3秒单次保存和失败无周期重试。 */
     Test_RunningFeedback(); /* 新反馈、调节限幅和死区。 */
     Test_StopFeedbackGates(); /* 每步必须有完整新周期且转速下降。 */
@@ -513,7 +548,7 @@ int main(void)
     Test_TimeAndSequenceWrap(); /* 时间和事件序号回绕。 */
     Test_SwitchingStages(); /* 升降速半程、最终档与稳定带。 */
     Test_SwitchingCatchupAndTimeout(); /* 多级跨越与中间档5秒处理。 */
-    Test_StableSpeedDeviation(); /* 保护边界、连续时间、逐步停止和恢复。 */
+    Test_StableSpeedDeviation(); /* 保护边界、连续时间、直接归零和旋转恢复。 */
     Test_DeviationResets(); /* 超差计时的三个复位条件。 */
     puts("fan_control: inputs/save/feedback/staged targets/stable protection/stop/wrap passed"); /* 输出实际测试结果。 */
     return 0;

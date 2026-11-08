@@ -208,12 +208,12 @@ void My_Task3(void)
         if (User_TakeSaveRequest(&status, &attempt_serial) != 0U) /* 对最新状态原子检查，只触发一次。 */
         {
             Fan_IO_FlashBegin(); /* 使旧测速失效，硬件PWM和编码器仍继续运行。 */
-            success = Fan_Settings_Save(status.control.target_rpm); /* 唯一运行时Flash保存调用。 */
+            success = Fan_Settings_Save(status.control.save_target_rpm); /* 唯一运行时Flash写入，仅保存人工选择的目标。 */
             Fan_IO_FlashEnd(); /* 丢弃跨擦写周期，等待新的完整捕获周期。 */
             taskENTER_CRITICAL(); /* 回报已保存值，不清除期间可能更新的用户目标。 */
             if (success != 0U)
             {
-                user_saved_rpm = status.control.target_rpm;
+                user_saved_rpm = status.control.save_target_rpm;
                 user_saved_valid = 1U;
             }
             user_storage_error = (success == 0U) ? 1U : 0U;

@@ -9,6 +9,7 @@
 #define FAN_FAULT_STOP_TIMEOUT   0x01U /* 减速一步后反馈未跟随，已强制请求0%。 */
 #define FAN_FAULT_TACH_LOST      0x02U /* 启动或运行过程中未取得有效测速。 */
 #define FAN_FAULT_SPEED_DEVIATION 0x04U /* 稳定运行后转速持续超出允许范围。 */
+#define FAN_FAULT_STAGE_TIMEOUT  0x08U /* 中间档5秒未过半程，已保护归零。 */
 
 /* 控制状态表示软件输出流程，不把0%请求等同于实物已经停转。 */
 typedef enum
@@ -31,7 +32,8 @@ typedef struct
 /* 状态仅由Task1修改，其他任务通过user_work中的一致快照读取。 */
 typedef struct
 {
-    uint16_t target_rpm;       /* 保留的用户目标，停止时不清零。 */
+    uint16_t target_rpm;       /* 当前运行目标，按键停机时保留，指定保护停机时归零。 */
+    uint16_t save_target_rpm;  /* 人工选择的目标，保护归零不覆盖待保存值。 */
     uint16_t control_target_rpm; /* 当前闭环追踪的中间或最终目标，0表示等待重新规划。 */
     uint16_t duty_permille;    /* 风扇端请求占空比，范围0～1000。 */
     uint8_t enabled;           /* 按键运行使能；0RPM档仍可保持使能。 */
