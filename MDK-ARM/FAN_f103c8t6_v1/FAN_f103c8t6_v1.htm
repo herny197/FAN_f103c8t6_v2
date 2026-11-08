@@ -3,7 +3,7 @@
 <title>Static Call Graph - [FAN_f103c8t6_v1\FAN_f103c8t6_v1.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image FAN_f103c8t6_v1\FAN_f103c8t6_v1.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060960: Last Updated: Sun Nov 08 15:24:04 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060960: Last Updated: Sun Nov 08 15:38:59 2026
 <BR><P>
 <H3>Maximum Stack Usage =        284 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -522,8 +522,8 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[e8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;user_Init
 </UL>
 
-<P><STRONG><a name="[63]"></a>Fan_Control_Input</STRONG> (Thumb, 158 bytes, Stack size 16 bytes, fan_control.o(i.Fan_Control_Input))
-<BR><BR>[Stack]<UL><LI>Max Depth = 16<LI>Call Chain = Fan_Control_Input
+<P><STRONG><a name="[63]"></a>Fan_Control_Input</STRONG> (Thumb, 138 bytes, Stack size 8 bytes, fan_control.o(i.Fan_Control_Input))
+<BR><BR>[Stack]<UL><LI>Max Depth = 8<LI>Call Chain = Fan_Control_Input
 </UL>
 <BR>[Calls]<UL><LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Fan_Control_Resume
 </UL>
@@ -540,7 +540,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[f4]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;User_TakeSaveRequest
 </UL>
 
-<P><STRONG><a name="[66]"></a>Fan_Control_Update</STRONG> (Thumb, 404 bytes, Stack size 32 bytes, fan_control.o(i.Fan_Control_Update))
+<P><STRONG><a name="[66]"></a>Fan_Control_Update</STRONG> (Thumb, 378 bytes, Stack size 32 bytes, fan_control.o(i.Fan_Control_Update))
 <BR><BR>[Stack]<UL><LI>Max Depth = 60<LI>Call Chain = Fan_Control_Update &rArr; Fan_Control_UpdateStop &rArr; Fan_Control_StopStep
 </UL>
 <BR>[Calls]<UL><LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Fan_Control_UpdateStop
@@ -1948,7 +1948,7 @@ Local Symbols
 <LI><a href="#[e7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;My_Task1
 </UL>
 
-<P><STRONG><a name="[ee]"></a>User_ReadStatus</STRONG> (Thumb, 174 bytes, Stack size 8 bytes, user_work.o(i.User_ReadStatus))
+<P><STRONG><a name="[ee]"></a>User_ReadStatus</STRONG> (Thumb, 170 bytes, Stack size 8 bytes, user_work.o(i.User_ReadStatus))
 <BR><BR>[Stack]<UL><LI>Max Depth = 8<LI>Call Chain = User_ReadStatus
 </UL>
 <BR>[Calls]<UL><LI><a href="#[f1]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;vPortExitCritical
@@ -1958,7 +1958,7 @@ Local Symbols
 <LI><a href="#[ec]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;My_Task2
 </UL>
 
-<P><STRONG><a name="[f4]"></a>User_TakeSaveRequest</STRONG> (Thumb, 218 bytes, Stack size 24 bytes, user_work.o(i.User_TakeSaveRequest))
+<P><STRONG><a name="[f4]"></a>User_TakeSaveRequest</STRONG> (Thumb, 214 bytes, Stack size 24 bytes, user_work.o(i.User_TakeSaveRequest))
 <BR><BR>[Stack]<UL><LI>Max Depth = 40<LI>Call Chain = User_TakeSaveRequest &rArr; Fan_Control_SaveDue
 </UL>
 <BR>[Calls]<UL><LI><a href="#[f1]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;vPortExitCritical
@@ -1989,12 +1989,12 @@ Local Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[66]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Fan_Control_Update
 </UL>
 
-<P><STRONG><a name="[60]"></a>Fan_Control_RequestZero</STRONG> (Thumb, 16 bytes, Stack size 0 bytes, fan_control.o(i.Fan_Control_RequestZero))
+<P><STRONG><a name="[60]"></a>Fan_Control_RequestZero</STRONG> (Thumb, 14 bytes, Stack size 0 bytes, fan_control.o(i.Fan_Control_RequestZero))
 <BR><BR>[Called By]<UL><LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Fan_Control_UpdateStop
 <LI><a href="#[5f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Fan_Control_Fail
 </UL>
 
-<P><STRONG><a name="[62]"></a>Fan_Control_Resume</STRONG> (Thumb, 44 bytes, Stack size 0 bytes, fan_control.o(i.Fan_Control_Resume))
+<P><STRONG><a name="[62]"></a>Fan_Control_Resume</STRONG> (Thumb, 42 bytes, Stack size 0 bytes, fan_control.o(i.Fan_Control_Resume))
 <BR><BR>[Called By]<UL><LI><a href="#[63]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Fan_Control_Input
 <LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Fan_Control_Init
 </UL>
