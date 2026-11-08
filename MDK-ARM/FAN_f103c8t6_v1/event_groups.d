@@ -1,0 +1,15 @@
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/event_groups.c
+fan_f103c8t6_v1\event_groups.o: C:\fenge\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+fan_f103c8t6_v1\event_groups.o: C:\fenge\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+fan_f103c8t6_v1\event_groups.o: C:\fenge\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+fan_f103c8t6_v1\event_groups.o: ../Core/Inc/FreeRTOSConfig.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM3/portmacro.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h
+fan_f103c8t6_v1\event_groups.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h
